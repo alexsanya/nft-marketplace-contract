@@ -40,7 +40,7 @@ contract NftMarketplaceTest is Test {
     Signature signature;
 
     function setUp() public {
-        nftMarketplace = new NftMarketplace(block.chainid);
+        nftMarketplace = new NftMarketplace();
         sigUtils = new SigUtils(nftMarketplace.DOMAIN_SEPARATOR());
         // create owner account
         owner = vm.addr(OWNER_PRIVATE_KEY);
@@ -84,7 +84,7 @@ contract NftMarketplaceTest is Test {
         bidDigest = sigUtils.getTypedDataHash(sigUtils.getBidHash(bidData, listingDigest));
     }
 
-    function test_Init() public view {
+    function test_init() public view {
         assertEq(erc20.balanceOf(buyer), 500);
         assertEq(erc721.balanceOf(owner), 1);
         assertEq(erc721.ownerOf(1), owner);
