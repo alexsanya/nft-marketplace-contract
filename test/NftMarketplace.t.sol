@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {NftMarketplace, ListingData, BidData, SettlementData} from "../src/NftMarketplace.sol";
+import {NftMarketplace, ListingData, BidData, Signature} from "../src/NftMarketplace.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
@@ -32,7 +32,7 @@ contract NftMarketplaceTest is Test {
 
     ListingData public listingData;
     BidData public bidData;
-    SettlementData public settlementData;
+    Signature signature;
 
     function setUp() public {
         nftMarketplace = new NftMarketplace();
@@ -55,30 +55,23 @@ contract NftMarketplaceTest is Test {
         
         bytes32 example = keccak256(abi.encodePacked("example data"));
 
+        signature = Signature({
+            v: 5,
+            r: example,
+            s: example
+        });
+
         listingData = ListingData({
             nftContract: erc721,
             tokenId: 1,
             minPriceCents: 100500,
-            nonce: 0,
-            v: 5,
-            r: example,
-            s: example
+            nonce: 0
         });
         
         bidData = BidData({
             tokenAddress: erc20,
             value: 250,
-            validUntil: block.timestamp + 1 hours,
-            buyer: buyer,
-            v: 7,
-            r: example,
-            s: example
-        });
-
-        settlementData = SettlementData({
-            v: 11,
-            r: example,
-            s: example
+            validUntil: block.timestamp + 1 hours
         });
     }
 
@@ -91,7 +84,7 @@ contract NftMarketplaceTest is Test {
     }
 
     function test_settlement_success() public {
-        nftMarketplace.settle(owner, listingData, bidData, settlementData);
+        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
         assertEq(erc20.balanceOf(buyer), 250);
         assertEq(erc20.balanceOf(owner), 250);
         assertEq(erc721.balanceOf(buyer), 1);
@@ -103,27 +96,27 @@ contract NftMarketplaceTest is Test {
     function test_settlement_deadline_expired() public {
         bidData.validUntil = 0;
         vm.expectRevert("Bid is expired");
-        nftMarketplace.settle(owner, listingData, bidData, settlementData);
+        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
     }
 
     function test_settlement_nonce_incorrect() public {
         listingData.nonce = 1;
         vm.expectRevert("Nonce is mismatched");
-        nftMarketplace.settle(owner, listingData, bidData, settlementData);
+        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
     }
 
     function test_owner_missing_nft() public {
         vm.prank(owner);
         erc721.transferFrom(owner, address(this), 1);
         vm.expectRevert();
-        nftMarketplace.settle(owner, listingData, bidData, settlementData);
+        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
     }
 
     function test_buyer_missing_tokens() public {
         vm.prank(buyer);
         erc20.transfer(address(this), 500);
         vm.expectRevert();
-        nftMarketplace.settle(owner, listingData, bidData, settlementData);
+        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
     }
 
 }
