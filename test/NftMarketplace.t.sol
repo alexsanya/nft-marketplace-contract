@@ -30,6 +30,10 @@ contract NftMarketplaceTest is Test {
     address owner;
     address buyer;
 
+    ListingData public listingData;
+    BidData public bidData;
+    SettlementData public settlementData;
+
     function setUp() public {
         nftMarketplace = new NftMarketplace();
         // create owner account
@@ -48,6 +52,34 @@ contract NftMarketplaceTest is Test {
         // approve ERC20 to nftMarketplace
         erc20.approve(address(nftMarketplace), erc20.balanceOf(buyer));
         vm.stopPrank();
+        
+        bytes32 example = keccak256(abi.encodePacked("example data"));
+
+        listingData = ListingData({
+            nftContract: erc721,
+            tokenId: 1,
+            minPriceCents: 100500,
+            nonce: 0,
+            v: 5,
+            r: example,
+            s: example
+        });
+        
+        bidData = BidData({
+            tokenAddress: erc20,
+            value: 250,
+            validUntil: block.timestamp + 1 hours,
+            buyer: buyer,
+            v: 7,
+            r: example,
+            s: example
+        });
+
+        settlementData = SettlementData({
+            v: 11,
+            r: example,
+            s: example
+        });
     }
 
     function test_Init() public view {
@@ -58,36 +90,39 @@ contract NftMarketplaceTest is Test {
         assertTrue(erc721.isApprovedForAll(owner, address(nftMarketplace)));
     }
 
-    function test_settlement() public {
-        
-        bytes32 example = keccak256(abi.encodePacked("example data"));
+    function test_settlement_success() public {
+        nftMarketplace.settle(owner, listingData, bidData, settlementData);
+        assertEq(erc20.balanceOf(buyer), 250);
+        assertEq(erc20.balanceOf(owner), 250);
+        assertEq(erc721.balanceOf(buyer), 1);
+        assertEq(erc721.ownerOf(1), buyer);
+        bytes32 key = keccak256(abi.encode(owner,listingData.nftContract,listingData.tokenId));
+        assertEq(nftMarketplace.nonces(key), 1);
+    }
+    
+    function test_settlement_deadline_expired() public {
+        bidData.validUntil = 0;
+        vm.expectRevert("Bid is expired");
+        nftMarketplace.settle(owner, listingData, bidData, settlementData);
+    }
 
-        ListingData memory listingData = ListingData({
-            nftContract: erc721,
-            tokenId: 1,
-            minPriceCents: 100500,
-            nonce: 0,
-            listingSigV: 5,
-            listingSigR: example,
-            listingSigS: example
-        });
-        
-        BidData memory bidData = BidData({
-            tokenAddress: erc20,
-            value: 250,
-            validUntil: block.timestamp + 1 hours,
-            buyer: buyer,
-            bidSigV: 7,
-            bidSigR: example,
-            bidSigS: example
-        });
+    function test_settlement_nonce_incorrect() public {
+        listingData.nonce = 1;
+        vm.expectRevert("Nonce is mismatched");
+        nftMarketplace.settle(owner, listingData, bidData, settlementData);
+    }
 
-        SettlementData memory settlementData = SettlementData({
-            settlementSigV: 11,
-            settlementSigR: example,
-            settlementSigS: example
-        });
+    function test_owner_missing_nft() public {
+        vm.prank(owner);
+        erc721.transferFrom(owner, address(this), 1);
+        vm.expectRevert();
+        nftMarketplace.settle(owner, listingData, bidData, settlementData);
+    }
 
+    function test_buyer_missing_tokens() public {
+        vm.prank(buyer);
+        erc20.transfer(address(this), 500);
+        vm.expectRevert();
         nftMarketplace.settle(owner, listingData, bidData, settlementData);
     }
 
