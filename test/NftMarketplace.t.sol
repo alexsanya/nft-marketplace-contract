@@ -34,6 +34,9 @@ contract NftMarketplaceTest is Test {
 
     ListingData public listingData;
     BidData public bidData;
+    bytes32 listingDigest;
+    bytes32 bidDigest;
+
     Signature signature;
 
     function setUp() public {
@@ -76,6 +79,9 @@ contract NftMarketplaceTest is Test {
             value: 250,
             validUntil: block.timestamp + 1 hours
         });
+
+        listingDigest = sigUtils.getTypedDataHash(sigUtils.getLisitngHash(listingData));
+        bidDigest = sigUtils.getTypedDataHash(sigUtils.getBidHash(bidData, listingDigest));
     }
 
     function test_Init() public view {
@@ -92,9 +98,6 @@ contract NftMarketplaceTest is Test {
     }
 
     function test_settlement_success() public {
-        bytes32 listingDigest = sigUtils.getTypedDataHash(sigUtils.getLisitngHash(listingData));
-        bytes32 bidDigest = sigUtils.getTypedDataHash(sigUtils.getBidHash(bidData, listingDigest));
-
         nftMarketplace.settle(
             owner,
             buyer, 
@@ -114,33 +117,127 @@ contract NftMarketplaceTest is Test {
 
     function test_listing_signature_invalid() public {
         vm.expectRevert("Listing signature is invalid");
-        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
+        nftMarketplace.settle(
+            owner,
+            buyer, 
+            listingData,
+            bidData,
+            _sign_digest(listingDigest, BUYER_PRIVATE_KEY),
+            _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
+            _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
+        );
+    }
+
+    function test_bid_signature_invalid() public {
+        vm.expectRevert("Bid signature is invalid");
+        nftMarketplace.settle(
+            owner,
+            buyer, 
+            listingData,
+            bidData,
+            _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
+            _sign_digest(bidDigest, OWNER_PRIVATE_KEY),
+            _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
+        );
+    }
+
+    function test_settlement_signature_invalid() public {
+        vm.expectRevert("Settlement signature is invalid");
+        nftMarketplace.settle(
+            owner,
+            buyer, 
+            listingData,
+            bidData,
+            _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
+            _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
+            _sign_digest(bidDigest, BUYER_PRIVATE_KEY)
+        );
     }
     
     function test_settlement_deadline_expired() public {
         bidData.validUntil = 0;
+        bidDigest = sigUtils.getTypedDataHash(sigUtils.getBidHash(bidData, listingDigest));
         vm.expectRevert("Bid is expired");
-        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
+        nftMarketplace.settle(
+            owner,
+            buyer, 
+            listingData,
+            bidData,
+            _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
+            _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
+            _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
+        );
     }
 
     function test_settlement_nonce_incorrect() public {
         listingData.nonce = 1;
+        listingDigest = sigUtils.getTypedDataHash(sigUtils.getLisitngHash(listingData));
+        bidDigest = sigUtils.getTypedDataHash(sigUtils.getBidHash(bidData, listingDigest));
         vm.expectRevert("Nonce is mismatched");
-        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
+        nftMarketplace.settle(
+            owner,
+            buyer, 
+            listingData,
+            bidData,
+            _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
+            _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
+            _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
+        );
+    }
+
+    function test_prevent_replay_attack() public {
+        nftMarketplace.settle(
+            owner,
+            buyer, 
+            listingData,
+            bidData,
+            _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
+            _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
+            _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
+        );
+        assertEq(erc721.ownerOf(1), buyer);
+        vm.prank(buyer);
+        erc721.transferFrom(buyer, owner, 1);
+        assertEq(erc721.ownerOf(1), owner);
+        vm.expectRevert("Nonce is mismatched");
+        nftMarketplace.settle(
+            owner,
+            buyer, 
+            listingData,
+            bidData,
+            _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
+            _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
+            _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
+        );
     }
 
     function test_owner_missing_nft() public {
         vm.prank(owner);
         erc721.transferFrom(owner, address(this), 1);
         vm.expectRevert();
-        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
+        nftMarketplace.settle(
+            owner,
+            buyer, 
+            listingData,
+            bidData,
+            _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
+            _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
+            _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
+        );
     }
 
     function test_buyer_missing_tokens() public {
         vm.prank(buyer);
         erc20.transfer(address(this), 500);
         vm.expectRevert();
-        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
+        nftMarketplace.settle(
+            owner,
+            buyer, 
+            listingData,
+            bidData,
+            _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
+            _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
+            _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
+        );
     }
-
 }
