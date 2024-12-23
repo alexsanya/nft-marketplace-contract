@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {NftMarketplace, ListingData, BidData, Signature} from "../src/NftMarketplace.sol";
+import {ListingSigUtils} from "./ListingSigUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
@@ -25,6 +26,7 @@ contract NftMarketplaceTest is Test {
     uint256 constant BUYER_PROVATE_KEY = 150e6;
 
     NftMarketplace public nftMarketplace;
+    ListingSigUtils listingSigUtils;
     TestERC20 public erc20;
     TestERC721 public erc721;
     address owner;
@@ -35,7 +37,8 @@ contract NftMarketplaceTest is Test {
     Signature signature;
 
     function setUp() public {
-        nftMarketplace = new NftMarketplace();
+        nftMarketplace = new NftMarketplace(block.chainid);
+        listingSigUtils = new ListingSigUtils(nftMarketplace.DOMAIN_SEPARATOR());
         // create owner account
         owner = vm.addr(OWNER_PRIVATE_KEY);
         vm.startPrank(owner);
@@ -83,14 +86,34 @@ contract NftMarketplaceTest is Test {
         assertTrue(erc721.isApprovedForAll(owner, address(nftMarketplace)));
     }
 
+    function _sign_digest(bytes32 digest, uint256 privateKey) internal returns (Signature memory) {
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+        return Signature({ v: v, r: r, s: s });
+    }
+
     function test_settlement_success() public {
-        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
+        bytes32 digest = listingSigUtils.getTypedDataHash(listingData);
+
+        nftMarketplace.settle(
+            owner,
+            buyer, 
+            listingData,
+            bidData,
+            _sign_digest(digest, OWNER_PRIVATE_KEY),
+            signature,
+            signature
+        );
         assertEq(erc20.balanceOf(buyer), 250);
         assertEq(erc20.balanceOf(owner), 250);
         assertEq(erc721.balanceOf(buyer), 1);
         assertEq(erc721.ownerOf(1), buyer);
         bytes32 key = keccak256(abi.encode(owner,listingData.nftContract,listingData.tokenId));
         assertEq(nftMarketplace.nonces(key), 1);
+    }
+
+    function test_listing_signature_invalid() public {
+        vm.expectRevert("Listing signature is invalid");
+        nftMarketplace.settle(owner, buyer, listingData, bidData, signature, signature, signature);
     }
     
     function test_settlement_deadline_expired() public {

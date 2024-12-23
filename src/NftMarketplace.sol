@@ -28,10 +28,26 @@ struct Signature {
 contract NftMarketplace {
     using SafeERC20 for IERC20;
 
+    string public constant name = "NFT Marketplace";
+    string public constant version = "1";
+    bytes32 public immutable DOMAIN_SEPARATOR;
+
     // we need this storage to prevent re-play attack
     mapping(bytes32 => uint256) public nonces;
 
-    event Settlement(address owner, ListingData listingData, BidData bidData);
+    event Settlement(address owner, address buyer, ListingData listingData, BidData bidData);
+
+    constructor(uint256 chainId) {
+        DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes(name)),
+                keccak256(bytes(version)),
+                chainId,
+                address(this)
+            )
+        );
+    }
 
     function settle(
         address owner,
@@ -54,12 +70,12 @@ contract NftMarketplace {
         require(nonces[key] == listingData.nonce, "Nonce is mismatched");
         // check signatures here
         _verifySignatures(owner, buyer, listingData, bidData, listingSig, bidSig, settlementSig);
-        // transfer ERC20 and NFT
+        // transfer ERC20 to owner
         bidData.tokenAddress.safeTransfer(owner, bidData.value);
         //no need safeTransferFrom cause I know the recepient is EOA
         listingData.nftContract.transferFrom(address(this), buyer, listingData.tokenId);
         nonces[key] += 1;
-        emit Settlement(owner, listingData, bidData);
+        emit Settlement(owner, buyer, listingData, bidData);
     }
 
     function _verifySignatures(
@@ -70,10 +86,10 @@ contract NftMarketplace {
         Signature calldata listingSig,
         Signature calldata bidSig,
         Signature calldata settlementSig
-    ) pure internal {
+    ) view internal {
         // throw errors if signature is invalid
         // check settlementData signature
-        bytes32 listingHash = keccak256(abi.encode(listingData.nftContract,listingData.tokenId,listingData.nonce,listingData.minPriceCents));
+        bytes32 listingHash = _getTypedDataHash(_getListingHash(listingData));
         // check that listingHash signed by owner address
         require(
             _checkMessageIsSignedBy(listingHash, owner, listingSig.v, listingSig.r, listingSig.s),
@@ -101,5 +117,35 @@ contract NftMarketplace {
     ) pure internal returns (bool) {
         return signer == ecrecover(data, v, r, s);
     }
+
+    function _getListingHash(ListingData memory listing)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return
+            keccak256(
+                abi.encode(
+                    keccak256("Listing(address nftContract,uint256 tokenId,uint256 minPriceCents,uint256 nonce)"),
+                    listing.nftContract,
+                    listing.tokenId,
+                    listing.minPriceCents,
+                    listing.nonce
+                )
+            );
+    }
+
+    function _getTypedDataHash(bytes32 data) internal view returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    DOMAIN_SEPARATOR,
+                    data
+                )
+            );
+    }
+
+
 
 }
