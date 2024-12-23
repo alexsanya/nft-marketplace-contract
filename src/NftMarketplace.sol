@@ -47,7 +47,7 @@ contract NftMarketplace {
         // reposess ERC20
         bidData.tokenAddress.safeTransferFrom(buyer, address(this), bidData.value);
         // reposess NFT
-        // no need safeTransferFrom cause I know the recepient
+        // no need safeTransferFrom cause I know the recepient is this contract
         listingData.nftContract.transferFrom(owner, address(this), listingData.tokenId);
         // check nonce
         bytes32 key = keccak256(abi.encode(owner,listingData.nftContract,listingData.tokenId));
@@ -56,7 +56,7 @@ contract NftMarketplace {
         _verifySignatures(owner, buyer, listingData, bidData, listingSig, bidSig, settlementSig);
         // transfer ERC20 and NFT
         bidData.tokenAddress.safeTransfer(owner, bidData.value);
-        //no need safeTransferFrom cause I know the recepient
+        //no need safeTransferFrom cause I know the recepient is EOA
         listingData.nftContract.transferFrom(address(this), buyer, listingData.tokenId);
         nonces[key] += 1;
         emit Settlement(owner, listingData, bidData);
