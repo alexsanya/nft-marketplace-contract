@@ -14,7 +14,7 @@ struct ListingData {
 }
 
 struct BidData {
-    IERC20 tokenAddress;
+    IERC20 tokenContract;
     uint256 value;
     uint256 validUntil;
 }
@@ -61,7 +61,7 @@ contract NftMarketplace {
         // cheapest checks at first
         require(block.timestamp <= bidData.validUntil, "Bid is expired");
         // reposess ERC20
-        bidData.tokenAddress.safeTransferFrom(buyer, address(this), bidData.value);
+        bidData.tokenContract.safeTransferFrom(buyer, address(this), bidData.value);
         // reposess NFT
         // no need safeTransferFrom cause I know the recepient is this contract
         listingData.nftContract.transferFrom(owner, address(this), listingData.tokenId);
@@ -71,7 +71,7 @@ contract NftMarketplace {
         // check signatures here
         _verifySignatures(owner, buyer, listingData, bidData, listingSig, bidSig, settlementSig);
         // transfer ERC20 to owner
-        bidData.tokenAddress.safeTransfer(owner, bidData.value);
+        bidData.tokenContract.safeTransfer(owner, bidData.value);
         //no need safeTransferFrom cause I know the recepient is EOA
         listingData.nftContract.transferFrom(address(this), buyer, listingData.tokenId);
         nonces[key] += 1;
@@ -95,7 +95,7 @@ contract NftMarketplace {
             _checkMessageIsSignedBy(listingHash, owner, listingSig.v, listingSig.r, listingSig.s),
             "Listing signature is invalid"
         );
-        bytes32 bidHash = keccak256(abi.encode(bidData.tokenAddress, bidData.value, bidData.validUntil, listingHash));
+        bytes32 bidHash = _getTypedDataHash(_getBidHash(bidData, listingHash));
         // check that bidDataHash signed by owner address
         require(
             _checkMessageIsSignedBy(bidHash, buyer, bidSig.v, bidSig.r, bidSig.s),
@@ -131,6 +131,23 @@ contract NftMarketplace {
                     listing.tokenId,
                     listing.minPriceCents,
                     listing.nonce
+                )
+            );
+    }
+
+    
+    function _getBidHash(BidData memory bid, bytes32 listingHash)
+        internal
+        pure
+        returns (bytes32)
+    {
+        return
+            keccak256(
+                abi.encode(
+                    keccak256("Bid(address tokenContract,uint256 value,uint256 validUntil,bytes32 listingHash)"),
+                    bid.tokenContract,
+                    bid.validUntil,
+                    listingHash
                 )
             );
     }

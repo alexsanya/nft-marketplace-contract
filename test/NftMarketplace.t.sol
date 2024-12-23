@@ -23,7 +23,7 @@ contract TestERC721 is ERC721 {
 
 contract NftMarketplaceTest is Test {
     uint256 constant OWNER_PRIVATE_KEY = 0xA11CE;
-    uint256 constant BUYER_PROVATE_KEY = 150e6;
+    uint256 constant BUYER_PRIVATE_KEY = 150e6;
 
     NftMarketplace public nftMarketplace;
     ListingSigUtils listingSigUtils;
@@ -48,7 +48,7 @@ contract NftMarketplaceTest is Test {
         erc721.setApprovalForAll(address(nftMarketplace), true);
         vm.stopPrank();
         // create byuer account
-        buyer = vm.addr(BUYER_PROVATE_KEY);
+        buyer = vm.addr(BUYER_PRIVATE_KEY);
         vm.startPrank(buyer);
         // create ERC20
         erc20 = new TestERC20();
@@ -72,7 +72,7 @@ contract NftMarketplaceTest is Test {
         });
         
         bidData = BidData({
-            tokenAddress: erc20,
+            tokenContract: erc20,
             value: 250,
             validUntil: block.timestamp + 1 hours
         });
@@ -86,21 +86,22 @@ contract NftMarketplaceTest is Test {
         assertTrue(erc721.isApprovedForAll(owner, address(nftMarketplace)));
     }
 
-    function _sign_digest(bytes32 digest, uint256 privateKey) internal returns (Signature memory) {
+    function _sign_digest(bytes32 digest, uint256 privateKey) internal pure returns (Signature memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
         return Signature({ v: v, r: r, s: s });
     }
 
     function test_settlement_success() public {
-        bytes32 digest = listingSigUtils.getTypedDataHash(listingData);
+        bytes32 listingDigest = listingSigUtils.getTypedDataHash(listingSigUtils.getLisitngHash(listingData));
+        bytes32 bidDigest = listingSigUtils.getTypedDataHash(listingSigUtils.getBidHash(bidData, listingDigest));
 
         nftMarketplace.settle(
             owner,
             buyer, 
             listingData,
             bidData,
-            _sign_digest(digest, OWNER_PRIVATE_KEY),
-            signature,
+            _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
+            _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
             signature
         );
         assertEq(erc20.balanceOf(buyer), 250);
