@@ -102,7 +102,7 @@ contract NftMarketplaceTest is Test {
             bidData,
             _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
             _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
-            signature
+            _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
         );
         assertEq(erc20.balanceOf(buyer), 250);
         assertEq(erc20.balanceOf(owner), 250);
