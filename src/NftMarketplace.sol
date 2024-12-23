@@ -60,16 +60,16 @@ contract NftMarketplace {
     ) external {
         // cheapest checks at first
         require(block.timestamp <= bidData.validUntil, "Bid is expired");
+        // check signatures here
+        _verifySignatures(owner, buyer, listingData, bidData, listingSig, bidSig, settlementSig);
+        // check nonce
+        bytes32 key = keccak256(abi.encode(owner,listingData.nftContract,listingData.tokenId));
+        require(nonces[key] == listingData.nonce, "Nonce is mismatched");
         // reposess ERC20
         bidData.tokenContract.safeTransferFrom(buyer, address(this), bidData.value);
         // reposess NFT
         // no need safeTransferFrom cause I know the recepient is this contract
         listingData.nftContract.transferFrom(owner, address(this), listingData.tokenId);
-        // check nonce
-        bytes32 key = keccak256(abi.encode(owner,listingData.nftContract,listingData.tokenId));
-        require(nonces[key] == listingData.nonce, "Nonce is mismatched");
-        // check signatures here
-        _verifySignatures(owner, buyer, listingData, bidData, listingSig, bidSig, settlementSig);
         // transfer ERC20 to owner
         bidData.tokenContract.safeTransfer(owner, bidData.value);
         //no need safeTransferFrom cause I know the recepient is EOA
