@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {NftMarketplace, ListingData, BidData, Signature} from "../src/NftMarketplace.sol";
-import {ListingSigUtils} from "./ListingSigUtils.sol";
+import {SigUtils} from "./SigUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
@@ -26,7 +26,7 @@ contract NftMarketplaceTest is Test {
     uint256 constant BUYER_PRIVATE_KEY = 150e6;
 
     NftMarketplace public nftMarketplace;
-    ListingSigUtils listingSigUtils;
+    SigUtils sigUtils;
     TestERC20 public erc20;
     TestERC721 public erc721;
     address owner;
@@ -38,7 +38,7 @@ contract NftMarketplaceTest is Test {
 
     function setUp() public {
         nftMarketplace = new NftMarketplace(block.chainid);
-        listingSigUtils = new ListingSigUtils(nftMarketplace.DOMAIN_SEPARATOR());
+        sigUtils = new SigUtils(nftMarketplace.DOMAIN_SEPARATOR());
         // create owner account
         owner = vm.addr(OWNER_PRIVATE_KEY);
         vm.startPrank(owner);
@@ -92,8 +92,8 @@ contract NftMarketplaceTest is Test {
     }
 
     function test_settlement_success() public {
-        bytes32 listingDigest = listingSigUtils.getTypedDataHash(listingSigUtils.getLisitngHash(listingData));
-        bytes32 bidDigest = listingSigUtils.getTypedDataHash(listingSigUtils.getBidHash(bidData, listingDigest));
+        bytes32 listingDigest = sigUtils.getTypedDataHash(sigUtils.getLisitngHash(listingData));
+        bytes32 bidDigest = sigUtils.getTypedDataHash(sigUtils.getBidHash(bidData, listingDigest));
 
         nftMarketplace.settle(
             owner,
