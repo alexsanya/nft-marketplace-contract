@@ -146,6 +146,7 @@ contract NftMarketplace {
                 abi.encode(
                     keccak256("Bid(address tokenContract,uint256 value,uint256 validUntil,bytes32 listingHash)"),
                     bid.tokenContract,
+                    bid.value,
                     bid.validUntil,
                     listingHash
                 )

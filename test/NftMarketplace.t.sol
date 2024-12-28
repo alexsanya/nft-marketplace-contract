@@ -12,12 +12,20 @@ contract TestERC20 is ERC20 {
         _mint(msg.sender, 500);
         this;
     }
+
+    function giveMeTokens(uint256 value) external {
+        _mint(msg.sender, value);
+    }
 }
 
 contract TestERC721 is ERC721 {
     constructor() ERC721("NFTtest", "NTST") {
         _mint(msg.sender, 1);
         this;
+    }
+
+    function receiveNFT(uint256 tokenId) external {
+        _mint(msg.sender, tokenId);
     }
 }
 
