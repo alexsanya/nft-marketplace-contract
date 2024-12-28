@@ -40,7 +40,7 @@ contract NftMarketplaceTest is Test {
     Signature signature;
 
     function setUp() public {
-        nftMarketplace = new NftMarketplace();
+        nftMarketplace = new NftMarketplace(11155111);
         sigUtils = new SigUtils(nftMarketplace.DOMAIN_SEPARATOR());
         // create owner account
         owner = vm.addr(OWNER_PRIVATE_KEY);

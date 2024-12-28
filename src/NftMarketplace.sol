@@ -37,13 +37,13 @@ contract NftMarketplace {
 
     event Settlement(address owner, address buyer, ListingData listingData, BidData bidData);
 
-    constructor() {
+    constructor(uint256 chainId) {
         DOMAIN_SEPARATOR = keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256(bytes(name)),
                 keccak256(bytes(version)),
-                block.chainid,
+                chainId,
                 address(this)
             )
         );
