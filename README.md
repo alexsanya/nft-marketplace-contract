@@ -1,19 +1,30 @@
-## Foundry
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+## NFT Marketplace contract
 
-Foundry consists of:
+**Run on-chain auction and sell NFT for ERC-20 via meta-transactions**
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+The auctions should work as follows:
 
-## Documentation
 
-https://book.getfoundry.sh/
+- Owner of the NFT approves all NFT’s to the Marketplace
+- Owner of the NFT signs to create an off-chain auction listing with a minimum price
+-  Bidder approves ERC20 tokens to Marketplace
+- Bidder signs a bid for the auction
+-  If owner approves the bid, signs it back and retrieve to bidder
+-   Anyone with both signatures can settle the transaction, the owner takes the ERC20 whilst the bidder takes the NFT.
 
-## Usage
+## Demo screencast
+[Unlisted - available only by direct link ]
+https://youtu.be/-mHsl1NFQio 
+
+## Deployment
+
+Sepolia: https://sepolia.etherscan.io/address/0x42d2C93839ED64b73Baa59A8ceB1C464287C8113
+
+## Features
+- Support of EIP-712 typed structured data hashing
+- Protection from re-play attack by introducing nonce in listing structure
+- Support TTL for bid
 
 ### Build
 
