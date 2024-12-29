@@ -66,27 +66,14 @@ contract NftMarketplaceTest is Test {
         // approve ERC20 to nftMarketplace
         erc20.approve(address(nftMarketplace), erc20.balanceOf(buyer));
         vm.stopPrank();
-        
+
         bytes32 example = keccak256(abi.encodePacked("example data"));
 
-        signature = Signature({
-            v: 5,
-            r: example,
-            s: example
-        });
+        signature = Signature({v: 5, r: example, s: example});
 
-        listingData = ListingData({
-            nftContract: erc721,
-            tokenId: 1,
-            minPriceCents: 100500,
-            nonce: 0
-        });
-        
-        bidData = BidData({
-            tokenContract: erc20,
-            value: 250,
-            validUntil: block.timestamp + 1 hours
-        });
+        listingData = ListingData({nftContract: erc721, tokenId: 1, minPriceCents: 100500, nonce: 0});
+
+        bidData = BidData({tokenContract: erc20, value: 250, validUntil: block.timestamp + 1 hours});
 
         listingDigest = sigUtils.getTypedDataHash(sigUtils.getLisitngHash(listingData));
         bidDigest = sigUtils.getTypedDataHash(sigUtils.getBidHash(bidData, listingDigest));
@@ -102,13 +89,13 @@ contract NftMarketplaceTest is Test {
 
     function _sign_digest(bytes32 digest, uint256 privateKey) internal pure returns (Signature memory) {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
-        return Signature({ v: v, r: r, s: s });
+        return Signature({v: v, r: r, s: s});
     }
 
     function test_settlement_success() public {
         nftMarketplace.settle(
             owner,
-            buyer, 
+            buyer,
             listingData,
             bidData,
             _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
@@ -119,7 +106,7 @@ contract NftMarketplaceTest is Test {
         assertEq(erc20.balanceOf(owner), 250);
         assertEq(erc721.balanceOf(buyer), 1);
         assertEq(erc721.ownerOf(1), buyer);
-        bytes32 key = keccak256(abi.encode(owner,listingData.nftContract,listingData.tokenId));
+        bytes32 key = keccak256(abi.encode(owner, listingData.nftContract, listingData.tokenId));
         assertEq(nftMarketplace.nonces(key), 1);
     }
 
@@ -127,7 +114,7 @@ contract NftMarketplaceTest is Test {
         vm.expectRevert("Listing signature is invalid");
         nftMarketplace.settle(
             owner,
-            buyer, 
+            buyer,
             listingData,
             bidData,
             _sign_digest(listingDigest, BUYER_PRIVATE_KEY),
@@ -140,7 +127,7 @@ contract NftMarketplaceTest is Test {
         vm.expectRevert("Bid signature is invalid");
         nftMarketplace.settle(
             owner,
-            buyer, 
+            buyer,
             listingData,
             bidData,
             _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
@@ -153,7 +140,7 @@ contract NftMarketplaceTest is Test {
         vm.expectRevert("Settlement signature is invalid");
         nftMarketplace.settle(
             owner,
-            buyer, 
+            buyer,
             listingData,
             bidData,
             _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
@@ -161,14 +148,14 @@ contract NftMarketplaceTest is Test {
             _sign_digest(bidDigest, BUYER_PRIVATE_KEY)
         );
     }
-    
+
     function test_settlement_deadline_expired() public {
         bidData.validUntil = 0;
         bidDigest = sigUtils.getTypedDataHash(sigUtils.getBidHash(bidData, listingDigest));
         vm.expectRevert("Bid is expired");
         nftMarketplace.settle(
             owner,
-            buyer, 
+            buyer,
             listingData,
             bidData,
             _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
@@ -184,7 +171,7 @@ contract NftMarketplaceTest is Test {
         vm.expectRevert("Nonce is mismatched");
         nftMarketplace.settle(
             owner,
-            buyer, 
+            buyer,
             listingData,
             bidData,
             _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
@@ -196,7 +183,7 @@ contract NftMarketplaceTest is Test {
     function test_prevent_replay_attack() public {
         nftMarketplace.settle(
             owner,
-            buyer, 
+            buyer,
             listingData,
             bidData,
             _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
@@ -210,7 +197,7 @@ contract NftMarketplaceTest is Test {
         vm.expectRevert("Nonce is mismatched");
         nftMarketplace.settle(
             owner,
-            buyer, 
+            buyer,
             listingData,
             bidData,
             _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
@@ -225,7 +212,7 @@ contract NftMarketplaceTest is Test {
         vm.expectRevert();
         nftMarketplace.settle(
             owner,
-            buyer, 
+            buyer,
             listingData,
             bidData,
             _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
@@ -240,7 +227,7 @@ contract NftMarketplaceTest is Test {
         vm.expectRevert();
         nftMarketplace.settle(
             owner,
-            buyer, 
+            buyer,
             listingData,
             bidData,
             _sign_digest(listingDigest, OWNER_PRIVATE_KEY),

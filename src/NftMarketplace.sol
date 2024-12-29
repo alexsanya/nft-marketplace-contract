@@ -1,4 +1,3 @@
-
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
@@ -63,7 +62,7 @@ contract NftMarketplace {
         // check signatures here
         _verifySignatures(owner, buyer, listingData, bidData, listingSig, bidSig, settlementSig);
         // check nonce
-        bytes32 key = keccak256(abi.encode(owner,listingData.nftContract,listingData.tokenId));
+        bytes32 key = keccak256(abi.encode(owner, listingData.nftContract, listingData.tokenId));
         require(nonces[key] == listingData.nonce, "Nonce is mismatched");
         // reposess ERC20
         bidData.tokenContract.safeTransferFrom(buyer, address(this), bidData.value);
@@ -86,7 +85,7 @@ contract NftMarketplace {
         Signature calldata listingSig,
         Signature calldata bidSig,
         Signature calldata settlementSig
-    ) view internal {
+    ) internal view {
         // throw errors if signature is invalid
         // check settlementData signature
         bytes32 listingHash = _getTypedDataHash(_getListingHash(listingData));
@@ -97,10 +96,7 @@ contract NftMarketplace {
         );
         bytes32 bidHash = _getTypedDataHash(_getBidHash(bidData, listingHash));
         // check that bidDataHash signed by owner address
-        require(
-            _checkMessageIsSignedBy(bidHash, buyer, bidSig.v, bidSig.r, bidSig.s),
-            "Bid signature is invalid"
-        );
+        require(_checkMessageIsSignedBy(bidHash, buyer, bidSig.v, bidSig.r, bidSig.s), "Bid signature is invalid");
         // check settlement signed by owner
         require(
             _checkMessageIsSignedBy(bidHash, owner, settlementSig.v, settlementSig.r, settlementSig.s),
@@ -108,62 +104,39 @@ contract NftMarketplace {
         );
     }
 
-    function _checkMessageIsSignedBy (
-        bytes32 data,
-        address signer,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) pure internal returns (bool) {
+    function _checkMessageIsSignedBy(bytes32 data, address signer, uint8 v, bytes32 r, bytes32 s)
+        internal
+        pure
+        returns (bool)
+    {
         return signer == ecrecover(data, v, r, s);
     }
 
-    function _getListingHash(ListingData memory listing)
-        internal
-        pure
-        returns (bytes32)
-    {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256("Listing(address nftContract,uint256 tokenId,uint256 minPriceCents,uint256 nonce)"),
-                    listing.nftContract,
-                    listing.tokenId,
-                    listing.minPriceCents,
-                    listing.nonce
-                )
-            );
+    function _getListingHash(ListingData memory listing) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                keccak256("Listing(address nftContract,uint256 tokenId,uint256 minPriceCents,uint256 nonce)"),
+                listing.nftContract,
+                listing.tokenId,
+                listing.minPriceCents,
+                listing.nonce
+            )
+        );
     }
 
-    
-    function _getBidHash(BidData memory bid, bytes32 listingHash)
-        internal
-        pure
-        returns (bytes32)
-    {
-        return
-            keccak256(
-                abi.encode(
-                    keccak256("Bid(address tokenContract,uint256 value,uint256 validUntil,bytes32 listingHash)"),
-                    bid.tokenContract,
-                    bid.value,
-                    bid.validUntil,
-                    listingHash
-                )
-            );
+    function _getBidHash(BidData memory bid, bytes32 listingHash) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                keccak256("Bid(address tokenContract,uint256 value,uint256 validUntil,bytes32 listingHash)"),
+                bid.tokenContract,
+                bid.value,
+                bid.validUntil,
+                listingHash
+            )
+        );
     }
 
     function _getTypedDataHash(bytes32 data) internal view returns (bytes32) {
-        return
-            keccak256(
-                abi.encodePacked(
-                    "\x19\x01",
-                    DOMAIN_SEPARATOR,
-                    data
-                )
-            );
+        return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, data));
     }
-
-
-
 }
