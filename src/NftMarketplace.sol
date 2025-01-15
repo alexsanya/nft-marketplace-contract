@@ -65,14 +65,10 @@ contract NftMarketplace {
         bytes32 key = keccak256(abi.encode(owner, listingData.nftContract, listingData.tokenId));
         require(nonces[key] == listingData.nonce, "Nonce is mismatched");
         // reposess ERC20
-        bidData.tokenContract.safeTransferFrom(buyer, address(this), bidData.value);
+        bidData.tokenContract.safeTransferFrom(buyer, owner, bidData.value);
         // reposess NFT
         // no need safeTransferFrom cause I know the recepient is this contract
-        listingData.nftContract.transferFrom(owner, address(this), listingData.tokenId);
-        // transfer ERC20 to owner
-        bidData.tokenContract.safeTransfer(owner, bidData.value);
-        //no need safeTransferFrom cause I know the recepient is EOA
-        listingData.nftContract.transferFrom(address(this), buyer, listingData.tokenId);
+        listingData.nftContract.transferFrom(owner, buyer, listingData.tokenId);
         nonces[key] += 1;
         emit Settlement(owner, buyer, listingData, bidData);
     }
